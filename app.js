@@ -1,0 +1,21 @@
+import express from "express"
+import productRoutes from "./routes/product.route.js"
+import productlistRoutes from "./routes/productlist.route.js"
+import userRoutes from "./routes/user.route.js"
+import cors from "cors"
+import cookieParser from "cookie-parser";
+
+const app = express()
+
+app.use(cors({
+    origin:' http://localhost:4200',
+    credentials: true
+}))
+app.use(cookieParser());
+
+app.use(express.json()); // for parsing application/json
+// Route prefix
+app.use('/api/product', productRoutes);
+app.use('/api/user',userRoutes)
+app.use('/api/productlist',productlistRoutes)
+export {app}
