@@ -12,9 +12,9 @@ const productSchema = new Schema({
         required:true,
     },
     category:{
-        type:String,
+        type: mongoose.Schema.ObjectId,
+        ref:'Category',
         required:true,
-        enum:['Shirt','jeans'],
     },
     description:{
         type:String,
@@ -29,7 +29,7 @@ const productSchema = new Schema({
     },
     ratings: {
       type: Number,
-      default: 0,
+      default: 5,
     },
     numReviews: {
       type: Number,

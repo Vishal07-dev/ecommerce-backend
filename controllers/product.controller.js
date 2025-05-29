@@ -99,7 +99,7 @@ export const getProductById = async (req, res) => {
 // Update product by ID
 export const updateProduct = async (req, res) => {
   try {
-    const { name, price, description, stock, image } = req.body;
+    const { name, price, description, stock, image,category } = req.body;
 
     const product = await Product.findById(req.params.id); // fetch existing product
 
@@ -113,6 +113,8 @@ export const updateProduct = async (req, res) => {
     product.description = description ?? product.description;
     product.stock = stock ?? product.stock;
     product.image = image ?? product.image;
+    product.category = category ?? product.category;
+
 
     const updatedProduct = await product.save(); // saves the changes to the same _id
     res.json(updatedProduct);
