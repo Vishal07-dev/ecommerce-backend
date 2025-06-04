@@ -4,6 +4,7 @@ import categoryRoutes from "./routes/category.route.js"
 import productlistRoutes from "./routes/productlist.route.js"
 import cartRoutes from "./routes/cart.route.js"
 import userRoutes from "./routes/user.route.js"
+import emailRoutes from "./routes/email.route.js"
 import cors from "cors"
 import cookieParser from "cookie-parser";
 
@@ -22,4 +23,6 @@ app.use('/api/category', categoryRoutes);
 app.use('/api/user',userRoutes)
 app.use('/api/productlist',productlistRoutes)
 app.use('/api/cart',cartRoutes)
+app.use('/api/contact', emailRoutes); // your endpoint is now: /api/send-email
+
 export {app}
