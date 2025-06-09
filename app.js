@@ -5,13 +5,14 @@ import productlistRoutes from "./routes/productlist.route.js"
 import cartRoutes from "./routes/cart.route.js"
 import userRoutes from "./routes/user.route.js"
 import emailRoutes from "./routes/email.route.js"
+import chatRoutes from "./routes/chat.route.js"
 import cors from "cors"
 import cookieParser from "cookie-parser";
 
 const app = express()
 
 app.use(cors({
-    origin:'https://ecommerce-frontend-three-ruby.vercel.app',
+    origin:'https://fjdhhqtq-4200.inc1.devtunnels.ms',
     credentials: true
 }))
 app.use(cookieParser());
@@ -24,5 +25,5 @@ app.use('/api/user',userRoutes)
 app.use('/api/productlist',productlistRoutes)
 app.use('/api/cart',cartRoutes)
 app.use('/api/contact', emailRoutes); // your endpoint is now: /api/send-email
-
+app.use('/api',chatRoutes)
 export {app}
