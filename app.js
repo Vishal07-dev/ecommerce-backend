@@ -12,7 +12,7 @@ import cookieParser from "cookie-parser";
 const app = express()
 
 app.use(cors({
-    origin:'https://fjdhhqtq-4200.inc1.devtunnels.ms',
+    origin:'https://ecommerce-frontend-three-ruby.vercel.app',
     credentials: true
 }))
 app.use(cookieParser());
