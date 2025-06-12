@@ -1,9 +1,11 @@
 import { Product } from '../models/product.model.js';
+import  {cloudinary}  from '../utils/cloudinary.js';
 
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
-    const { name, price, description, stock, image,category } = req.body;
+     const image = req.file.path;
+    const { name, price, description, stock,category } = req.body;
 
     const productExists = await Product.findOne({ name });
     if (productExists) {
@@ -97,31 +99,43 @@ export const getProductById = async (req, res) => {
 };
 
 // Update product by ID
+
 export const updateProduct = async (req, res) => {
   try {
-    const { name, price, description, stock, image,category } = req.body;
+    const { name, price, description, stock, category } = req.body;
 
-    const product = await Product.findById(req.params.id); // fetch existing product
+    // Find the existing product
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
 
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+    // If new image uploaded, replace the old one
+    if (req.file) {
+      // Optional: delete old image from cloudinary
+      const oldImageUrl = product.image;
+      const publicIdMatch = oldImageUrl.match(/\/([^/]+)\.[a-z]+$/); // extract publicId
+      if (publicIdMatch) {
+        const publicId = `ecommerce-products/${publicIdMatch[1]}`;
+        await cloudinary.uploader.destroy(publicId);
+      }
+
+      // Set new image
+      product.image = req.file.path;
     }
 
-    // Update only the fields provided
-    product.name = name ?? product.name;
-    product.price = price ?? product.price;
-    product.description = description ?? product.description;
-    product.stock = stock ?? product.stock;
-    product.image = image ?? product.image;
-    product.category = category ?? product.category;
+    // Update other fields
+    product.name = name || product.name;
+    product.price = price || product.price;
+    product.description = description || product.description;
+    product.stock = stock || product.stock;
+    product.category = category || product.category;
 
-
-    const updatedProduct = await product.save(); // saves the changes to the same _id
-    res.json(updatedProduct);
+    const updated = await product.save();
+    res.status(200).json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-}
+};
+
 
 // Delete product by ID
 export const deleteProduct = async (req, res) => {
