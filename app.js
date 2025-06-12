@@ -6,6 +6,8 @@ import cartRoutes from "./routes/cart.route.js"
 import userRoutes from "./routes/user.route.js"
 import emailRoutes from "./routes/email.route.js"
 import chatRoutes from "./routes/chat.route.js"
+import paymentRoutes from "./routes/payment.route.js"
+
 import wishListRoutes from "./routes/wishList.route.js"
 
 import cors from "cors"
@@ -29,4 +31,5 @@ app.use('/api/cart',cartRoutes)
 app.use('/api/contact', emailRoutes); // your endpoint is now: /api/send-email
 app.use('/api',chatRoutes)
 app.use('/api/wishlist',wishListRoutes)
+app.use('/api/payment',paymentRoutes)
 export {app}
