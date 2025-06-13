@@ -7,6 +7,8 @@ import userRoutes from "./routes/user.route.js"
 import emailRoutes from "./routes/email.route.js"
 import chatRoutes from "./routes/chat.route.js"
 import paymentRoutes from "./routes/payment.route.js"
+import receiptRoutes from "./routes/recepiet.route.js"
+
 
 import wishListRoutes from "./routes/wishList.route.js"
 
@@ -16,7 +18,7 @@ import cookieParser from "cookie-parser";
 const app = express()
 
 app.use(cors({
-    origin:'https://ecommerce-frontend-three-ruby.vercel.app',
+    origin:'http://localhost:4200',
     credentials: true
 }))
 app.use(cookieParser());
@@ -32,4 +34,6 @@ app.use('/api/contact', emailRoutes); // your endpoint is now: /api/send-email
 app.use('/api',chatRoutes)
 app.use('/api/wishlist',wishListRoutes)
 app.use('/api/payment',paymentRoutes)
+app.use('/api/receipet',receiptRoutes)
+
 export {app}
