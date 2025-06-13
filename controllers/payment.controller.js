@@ -1,6 +1,9 @@
 import Stripe from 'stripe';
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // from .env
 import { Order } from '../models/Order.js';
+import dotenv from 'dotenv';
+dotenv.config();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // from .env
+
 
 export const createCheckoutSession = async (req, res) => {
   const { items } = req.body; // [{ name, price, quantity }]
@@ -28,9 +31,9 @@ export const createCheckoutSession = async (req, res) => {
         quantity: item.quantity
       })),
 
-      success_url: `http://localhost:4200/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `https://ecommerce-frontend-three-ruby.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
       // Cancel page
-      cancel_url: 'http://localhost:4200/cancel'
+      cancel_url: 'https://ecommerce-frontend-three-ruby.vercel.app/cancel'
     });
 
     res.json({ url: session.url }); // Send session URL to frontend
