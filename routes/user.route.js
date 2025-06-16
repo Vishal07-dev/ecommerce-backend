@@ -26,20 +26,21 @@ router.post("/refresh-token", (req, res) => {
   }
 
   try {
-    console.log(token,'wefcewa');
-    console.log(process.env.REFRESH_TOKEN_SECRET);
-    
-    
+    // Verify refresh token
     const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
 
+    // Create a new short-lived access token
     const newAccessToken = jwt.sign(
-      { id: decoded.id },
+      { id: decoded.id, role: decoded.role }, // include role if needed
       process.env.JWT_SECRET,
-      { expiresIn: process.env.REFRESH_EXPIRES_IN }
+      { expiresIn: process.env.ACCESS_EXPIRES_IN || '30s' }
     );
 
+    // Return only access token; refresh token stays in cookie
     res.json({ accessToken: newAccessToken });
+
   } catch (err) {
+    console.error('Refresh error:', err.message);
     return res.status(403).json({ message: "Invalid refresh token" });
   }
 });
