@@ -1,0 +1,29 @@
+name: Keep MongoDB alive
+
+# Atlas pauses Free (M0) clusters after 30 days without connections.
+# This pings the cluster weekly so it stays active.
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # every Monday at 03:00 UTC
+  workflow_dispatch: # manual "Run workflow" button for testing
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm install mongodb
+      - name: Ping MongoDB
+        run: |
+          node -e "
+          const { MongoClient } = require('mongodb');
+          (async () => {
+            const client = new MongoClient(process.env.MONGOURL);
+            await client.connect();
+            await client.db().command({ ping: 1 });
+            console.log('MongoDB pinged successfully');
+            await client.close();
+          })().catch(err => { console.error(err); process.exit(1); });
+          "
+        env:
+          MONGOURL: ${{ secrets.MONGOURL }}
