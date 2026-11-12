@@ -119,3 +119,13 @@ export const getuser = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+
+export const logoutUser = (req, res) => {
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict', // make sure this matches how you set it
+  });
+  res.status(200).json({ message: 'Logged out successfully' });
+};

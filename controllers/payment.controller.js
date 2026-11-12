@@ -1,39 +1,74 @@
 import Stripe from 'stripe';
 import { Order } from '../models/Order.js';
+import { Product } from '../models/product.model.js';
 import dotenv from 'dotenv';
 dotenv.config();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // from .env
 
+// Where Stripe sends the shopper back. Set CLIENT_URL in .env for local work;
+// it falls back to the deployed storefront.
+const CLIENT_URL = process.env.CLIENT_URL || 'https://ecommerce-frontend-three-ruby.vercel.app';
+
+export const FREE_DELIVERY_FROM = 5000; // INR
+export const DELIVERY_FEE = 250;        // INR
 
 export const createCheckoutSession = async (req, res) => {
-  const { items } = req.body; // [{ name, price, quantity }]
+  const { items } = req.body; // [{ productId, size, quantity }]
 
   try {
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Your bag is empty.' });
+    }
+
+    // Price every line from the database, never from the browser.
+    const products = await Product.find({ _id: { $in: items.map(i => i.productId) } });
+    const byId = Object.fromEntries(products.map(p => [String(p._id), p]));
+    const lines = items
+      .map(item => ({ item, product: byId[String(item.productId)] }))
+      .filter(({ product }) => product && !product.isArchived);
+    if (lines.length === 0) {
+      return res.status(400).json({ error: 'These pieces are no longer available.' });
+    }
+
+    // Delivery: free from ₹5,000, otherwise a flat ₹250. The storefront shows
+    // the same rule (front-end/src/service/cartService/cart.service.ts).
+    const subtotal = lines.reduce((n, { item, product }) => n + product.price * Math.max(1, Number(item.quantity) || 1), 0);
+    const deliveryFee = subtotal >= FREE_DELIVERY_FROM ? 0 : DELIVERY_FEE;
+
     const session = await stripe.checkout.sessions.create({
-      // Add more payment methods as needed
       mode: 'payment',
-
-      line_items: items.map((item) => ({
-        price_data: {
-          currency: 'inr',
-          unit_amount: item.price * 100,
-          product_data: {
-            name: item.name,
-            description: 'Optional description',
-            images: [item.image], // ✅ must be a public URL
-            metadata: {
-              category: item.category.name,
-              productId: item.productId,
-              originalPrice: item.originalPrice
-            }
-          }
+      shipping_options: [{
+        shipping_rate_data: {
+          type: 'fixed_amount',
+          fixed_amount: { amount: deliveryFee * 100, currency: 'inr' },
+          display_name: deliveryFee ? 'Standard delivery' : 'Free delivery',
+          delivery_estimate: { minimum: { unit: 'business_day', value: 3 }, maximum: { unit: 'business_day', value: 6 } },
         },
-        quantity: item.quantity
-      })),
+      }],
 
-      success_url: `https://ecommerce-frontend-three-ruby.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
-      // Cancel page
-      cancel_url: 'https://ecommerce-frontend-three-ruby.vercel.app/cancel'
+      line_items: lines.map(({ item, product }) => {
+        const size = item.size || 'One size';
+        const image = product.images?.find(i => i.role === 'model')?.url || product.images?.[0]?.url || product.image;
+        return {
+          price_data: {
+            currency: 'inr',
+            unit_amount: Math.round(product.price * 100),
+            product_data: {
+              name: `${product.name} (${size})`,
+              description: [product.colorway?.name, size].filter(Boolean).join(' · '),
+              ...(image ? { images: [image] } : {}),
+              metadata: {
+                productId: String(product._id),
+                size,
+              }
+            }
+          },
+          quantity: Math.max(1, Number(item.quantity) || 1)
+        };
+      }),
+
+      success_url: `${CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${CLIENT_URL}/cancel`
     });
 
     res.json({ url: session.url }); // Send session URL to frontend

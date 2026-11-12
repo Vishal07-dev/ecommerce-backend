@@ -1,21 +1,38 @@
 import { Product } from '../models/product.model.js';
 import  {cloudinary}  from '../utils/cloudinary.js';
+import { Category } from '../models/category.model.js';
+import { Collection } from '../models/collection.model.js';
+import mongoose from 'mongoose';
 
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
      const image = req.file.path;
     const { name, price, description, stock,category } = req.body;
+    
+    const status = await Category.findOne({
+      _id : category
+    })
 
+    if(!status)
+    {
+        return res.status(400).json({ message: 'Category does not exist' });
+    }
+    
     const productExists = await Product.findOne({ name });
     if (productExists) {
       return res.status(400).json({ message: 'Product already exists' });
     }
 
+    if(status.status === 'Active')
+    {
     const product = new Product({ name, price, description, stock, image ,category});
     const savedProduct = await product.save();
-
     res.status(201).json(savedProduct);
+    }
+    else{
+        return res.status(400).json({ message: 'Category is not active' });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -52,15 +69,38 @@ export const getProducts = async (req, res) => {
       if (minPrice) filter.price.$gte = Number(minPrice);
       if (maxPrice) filter.price.$lte = Number(maxPrice);
     }
+    // Archived products stay in the database but leave the storefront.
+    if (req.query.includeArchived !== 'true') {
+      filter.isArchived = { $ne: true };
+    }
+    if (req.query.edition) {
+      const edition = await Collection.findOne({ slug: req.query.edition });
+      filter.edition = edition?._id ?? null;
+    }
+    if (req.query.featured === 'true') {
+      filter['featured.order'] = { $exists: true };
+    }
+    if (req.query.size) {
+      filter.variants = { $elemMatch: { size: req.query.size, stock: { $gt: 0 } } };
+    }
+    if (req.query.exclude) {
+      filter._id = { $ne: req.query.exclude };
+    }
 
     // 3) calculate pagination
     const skip = (Number(page) - 1) * Number(limit);
 
-    // 4) build the Mongoose query
-    let query = Product.find(filter).populate('category');
-    if (sortBy) {
-      query = query.sort(sortBy);
-    }
+    // 4) build the Mongoose query. Sort keys are whitelisted.
+    const SORTS = {
+      featured: { 'featured.order': 1, createdAt: -1 },
+      newest: { createdAt: -1 },
+      'price-asc': { price: 1 },
+      'price-desc': { price: -1 },
+      price: { price: 1 },
+      '-price': { price: -1 },
+    };
+    let query = Product.find(filter).populate('category').populate('edition', 'name slug season');
+    query = query.sort(SORTS[sortBy] ?? (req.query.featured === 'true' ? SORTS.featured : { createdAt: -1 }));
 
     // 5) apply pagination
     query = query.skip(skip).limit(Number(limit));
@@ -87,10 +127,13 @@ export const getProducts = async (req, res) => {
 
 
 
-// Get single product by ID
+// Get single product by ID, or by slug for the editorial storefront
 export const getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const key = req.params.id;
+    const product = mongoose.isValidObjectId(key)
+      ? await Product.findById(key).populate('category').populate('edition', 'name slug season')
+      : await Product.findOne({ slug: key }).populate('category').populate('edition', 'name slug season');
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (error) {

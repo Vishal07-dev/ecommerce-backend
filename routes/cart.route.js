@@ -1,10 +1,24 @@
 import express from 'express';
-import { addItemToCart, getUserCart, mergeProduct, removeCartItem } from '../controllers/cart.controller.js';
+import { protect } from '../middlewares/authmiddleware.js';
+import {
+  addItemToCart,
+  clearCart,
+  getUserCart,
+  mergeProduct,
+  removeCartItem,
+  updateCartItem,
+} from '../controllers/cart.controller.js';
+
 const router = express.Router();
 
-router.post('/add', addItemToCart);
-router.get('/show',getUserCart)
-router.delete('/delete/:id',removeCartItem)
-router.post('/merge',mergeProduct)
-export default router;
+// Every cart route identifies the user from the verified token.
+router.use(protect);
 
+router.get('/show', getUserCart);
+router.post('/add', addItemToCart);
+router.patch('/items/:itemId', updateCartItem);
+router.delete('/items/:itemId', removeCartItem);
+router.delete('/', clearCart);
+router.post('/merge', mergeProduct);
+
+export default router;

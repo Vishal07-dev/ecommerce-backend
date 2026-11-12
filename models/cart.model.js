@@ -1,10 +1,16 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose from "mongoose";
 
+// A cart line is one product in one size. The line's own _id is what the
+// storefront uses to change quantity or remove it.
 const cartItemSchema = new mongoose.Schema({
-   productId: {
+  productId: {
     type: mongoose.Schema.ObjectId,
     ref: 'Product',
     required: true
+  },
+  size: {
+    type: String,
+    default: 'One size'
   },
   quantity: {
     type: Number,
@@ -33,15 +39,11 @@ const cartSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
 }, { timestamps: true });
 
+cartSchema.methods.recalculate = function () {
+  this.totalPrice = this.items.reduce((total, item) => total + item.quantity * item.priceAtTime, 0);
+  return this;
+};
 
-export const Cart = mongoose.model("Cart",cartSchema)
+export const Cart = mongoose.model("Cart", cartSchema)

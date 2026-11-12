@@ -1,5 +1,5 @@
 import express from "express"
-import {register,loginUser, updateUser, getuser} from "../controllers/user.controller.js"
+import {register,loginUser, updateUser, getuser,logoutUser} from "../controllers/user.controller.js"
 import { protect,isAdmin } from "../middlewares/authmiddleware.js"
 import jwt from "jsonwebtoken";
 
@@ -44,6 +44,8 @@ router.post("/refresh-token", (req, res) => {
     return res.status(403).json({ message: "Invalid refresh token" });
   }
 });
+
+router.post("/logout",logoutUser)
 
 
 export default router
