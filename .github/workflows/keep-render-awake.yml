@@ -1,0 +1,37 @@
+name: Keep API awake
+
+# Render's free plan puts the API to sleep after 15 minutes without traffic,
+# and the next visitor then waits 30-60 seconds for it to wake. This calls a
+# light endpoint every 10 minutes so it stays awake. GitHub runs scheduled
+# jobs on a best-effort basis (they can start late or be skipped when GitHub
+# is busy), so this reduces cold starts rather than guaranteeing none.
+#
+# The endpoint also reads from MongoDB, so it keeps the Atlas cluster active.
+#
+# Note: GitHub turns off scheduled workflows in a public repo after 60 days
+# with no commits. If that happens, re-enable it on the repo's Actions tab.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes (UTC)
+  workflow_dispatch: # manual "Run workflow" button for testing
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping the API
+        env:
+          API_URL: https://ecommerce-backend-n4tk.onrender.com/api/editorial/hero
+        run: |
+          # A sleeping server can take up to a minute to answer, so allow
+          # for that and retry once before reporting a failure.
+          for attempt in 1 2; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$API_URL" || true)
+            seconds=$(curl -s -o /dev/null -w '%{time_total}' --max-time 30 "$API_URL" || true)
+            echo "Attempt $attempt: HTTP $status, warm response ${seconds}s"
+            if [ "$status" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "The API did not answer with 200." && exit 1
