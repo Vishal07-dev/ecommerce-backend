@@ -18,8 +18,16 @@ import cookieParser from "cookie-parser";
 
 const app = express()
 
+// The storefront that may call this API with cookies: the live site, plus
+// the local dev server. CLIENT_URL (set in .env / on Render) is added too.
+const allowedOrigins = [
+    'https://ecommerce-frontend-three-ruby.vercel.app',
+    'http://localhost:4200',
+    process.env.CLIENT_URL,
+].filter(Boolean)
+
 app.use(cors({
-    origin:'https://ecommerce-frontend-three-ruby.vercel.app',
+    origin: allowedOrigins,
     credentials: true
 }))
 app.use(cookieParser());

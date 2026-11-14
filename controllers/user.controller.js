@@ -44,6 +44,17 @@ const generateRefreshToken = (user) => {
 
 
 
+/**
+ * The storefront (vercel.app) and this API (onrender.com) are different sites,
+ * so the "stay signed in" cookie must be SameSite=None and Secure or browsers
+ * never send it back, and shoppers get signed out when the access token
+ * expires. Locally (http://localhost) Secure cookies can't be set, so use Lax.
+ */
+function refreshCookieOptions() {
+  const local = (process.env.CLIENT_URL ?? '').startsWith('http://localhost');
+  return { httpOnly: true, secure: !local, sameSite: local ? 'lax' : 'none' };
+}
+
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
@@ -59,9 +70,7 @@ export const loginUser = async (req, res) => {
   const refreshToken = generateRefreshToken(user);
     res
     .cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'strict',
+      ...refreshCookieOptions(),
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     })
     .json({userProfile, accessToken });
@@ -126,10 +135,6 @@ export const getuser = async (req, res) => {
 
 
 export const logoutUser = (req, res) => {
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'strict', // make sure this matches how you set it
-  });
+  res.clearCookie('refreshToken', refreshCookieOptions());
   res.status(200).json({ message: 'Logged out successfully' });
 };

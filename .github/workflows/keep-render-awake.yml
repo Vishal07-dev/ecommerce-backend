@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Ping the API
         env:
-          API_URL: https://ecommerce-backend-n4tk.onrender.com/api/editorial/hero
+          API_URL: https://kora-api-sg.onrender.com/api/editorial/hero
         run: |
           # A sleeping server can take up to a minute to answer, so allow
           # for that and retry once before reporting a failure.
