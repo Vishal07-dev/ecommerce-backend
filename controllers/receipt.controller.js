@@ -1,10 +1,13 @@
 import PDFDocument from 'pdfkit';
 import { Order } from '../models/Order.js';
+import { ownsOrder } from './account.controller.js';
 
 export const downloadReceipt = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
+    // Receipts carry personal details: only the buyer (or an admin) may download one.
+    if (!(await ownsOrder(req.user, order))) return res.status(404).json({ message: 'Order not found' });
 
     // Create PDF document with custom margins
     const doc = new PDFDocument({ 

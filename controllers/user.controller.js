@@ -50,7 +50,6 @@ export const loginUser = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "Invalid credentials" });
-console.log(user,'ejkds');
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
@@ -74,16 +73,21 @@ console.log(user,'ejkds');
 
 export const updateUser = async(req, res)=>{
   try {
-    const {name,email,address} = req.body
-  const user = await User.findById(req.params.id); // fetch existing product
-  if (!user) {
-      return res.status(404).json({ message: 'Product not found' });
+    // Only the account owner or an admin may change an account.
+    if (req.user.role !== 'admin' && String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ message: 'You can only change your own account.' });
     }
- user.name = name ?? user.name;
-    user.email = email ?? product.email;
-    user.address = address ?? product.address;
-       const updatedProduct = await user.save(); // saves the changes to the same _id
-    res.json(updatedProduct);
+    const {name,email,address} = req.body
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    user.name = name ?? user.name;
+    user.email = email ?? user.email;
+    user.address = address ?? user.address;
+    const updated = await user.save();
+    const { password: _, refreshtoken: __, ...safe } = updated.toObject();
+    res.json(safe);
   } 
   
 catch (error) {

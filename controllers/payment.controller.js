@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { Order } from '../models/Order.js';
 import { Product } from '../models/product.model.js';
+import { User } from '../models/user.model.js';
 import dotenv from 'dotenv';
 dotenv.config();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // from .env
@@ -35,8 +36,12 @@ export const createCheckoutSession = async (req, res) => {
     const subtotal = lines.reduce((n, { item, product }) => n + product.price * Math.max(1, Number(item.quantity) || 1), 0);
     const deliveryFee = subtotal >= FREE_DELIVERY_FROM ? 0 : DELIVERY_FEE;
 
+    // Signed-in shoppers: tie the payment to their account and prefill email.
+    const buyer = req.user ? await User.findById(req.user.id).select('email') : null;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      ...(buyer ? { client_reference_id: String(buyer._id), customer_email: buyer.email } : {}),
       shipping_options: [{
         shipping_rate_data: {
           type: 'fixed_amount',
@@ -82,21 +87,36 @@ export const storeOrderAfterPayment = async (req, res) => {
   const { sessionId } = req.body;
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['line_items', 'customer']
-    });
+    if (typeof sessionId !== 'string' || !sessionId.startsWith('cs_')) {
+      return res.status(400).json({ error: 'Missing checkout session.' });
+    }
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.payment_status !== 'paid') {
+      return res.status(402).json({ error: 'This payment hasn’t gone through.' });
+    }
 
-    const lineItems = await stripe.checkout.sessions.listLineItems(sessionId);
+    // Reloading the success page must not create a second order.
+    const existing = await Order.findOne({ sessionId: session.id });
+    if (existing) return res.status(200).json({ message: 'Order already saved', orderId: existing._id });
+
+    const lineItems = await stripe.checkout.sessions.listLineItems(sessionId, { expand: ['data.price.product'] });
 
     const order = new Order({
       sessionId: session.id,
-      email: session.customer_details.email,
+      email: session.customer_details?.email ?? session.customer_email,
+      ...(session.client_reference_id ? { userId: session.client_reference_id } : {}),
       totalAmount: session.amount_total / 100,
-      items: lineItems.data.map(item => ({
-        name: item.description,
-        quantity: item.quantity,
-        price: item.amount_total / 100
-      }))
+      items: lineItems.data.map(item => {
+        const product = typeof item.price?.product === 'object' ? item.price.product : null;
+        return {
+          name: item.description,
+          quantity: item.quantity,
+          price: item.amount_total / 100,
+          productId: product?.metadata?.productId,
+          size: product?.metadata?.size,
+          image: product?.images?.[0],
+        };
+      })
     });
 
     await order.save();

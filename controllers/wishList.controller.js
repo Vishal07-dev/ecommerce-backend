@@ -1,150 +1,63 @@
-import {Wish} from "../models/wishList.model.js";
-import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import { Wish } from "../models/wishList.model.js";
+
+/**
+ * The signed-in shopper's saved pieces. Routes sit behind `protect`, so an
+ * expired token gets a 401 (which the storefront refreshes and retries)
+ * instead of a 500. Every response has the same shape:
+ *   { items: Product[], ids: string[] }   newest saves first
+ */
+
+// What the storefront's product card needs, and nothing more.
+const CARD_FIELDS = 'name slug subtitle price compareAtPrice images image variants stock colorway edition isArchived';
+
+const isId = id => mongoose.isValidObjectId(id);
+
+async function respond(res, userId, status = 200) {
+  const wish = await Wish.findOne({ user: userId }).populate({ path: 'products', select: CARD_FIELDS, populate: { path: 'edition', select: 'name slug season' } });
+  const items = (wish?.products ?? [])
+    .filter(p => p && !p.isArchived)   // deleted or archived pieces drop out quietly
+    .reverse();                        // newest saves first
+  res.status(status).json({ items, ids: items.map(p => String(p._id)) });
+}
+
+export const getUserWishList = async (req, res) => {
+  try { await respond(res, req.user.id); }
+  catch (error) { res.status(500).json({ message: 'We couldn’t load your saved pieces.' }); }
+};
 
 export const addItemToWishList = async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
     const { productId } = req.body;
-
-    let wishList = await Wish.findOne({ user: userId });
-
-    if (!wishList) {
-      wishList = new Wish({ user: userId, products: [] });
-    }
-
-    if (!wishList.products.includes(productId )) {
-      wishList.products.push(productId );
-      await wishList.save();
-    }
-
-    res.status(200).json(wishList);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-// Get user's wishlist
-export const getUserWishList = async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
-
-    const wishList = await Wish.findOne({ user: userId }).populate("products");
-
-    if (!wishList) {
-      return res.status(404).json({ message: "Wishlist not found." });
-    }
-
-    res.status(200).json(wishList);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    if (!isId(productId)) return res.status(400).json({ message: 'That piece couldn’t be found.' });
+    // $addToSet keeps each piece once; upsert creates the list on first save.
+    await Wish.updateOne({ user: req.user.id }, { $addToSet: { products: productId } }, { upsert: true });
+    await respond(res, req.user.id);
+  } catch (error) { res.status(500).json({ message: 'We couldn’t save that piece.' }); }
 };
 
-// Remove item from wishlist
 export const removeItemFromWishList = async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
-    // const { productId } = req.body;
- const productId = req.params.id;
-    const wishList = await Wish.findOne({ user: userId });
-
-    if (!wishList) {
-      return res.status(404).json({ message: "Wishlist not found." });
-    }
-
-    wishList.products = wishList.products.filter(
-      (id) => id.toString() !== productId
-    );
-
-    await wishList.save();
-
-    res.status(200).json(wishList);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    if (!isId(req.params.id)) return res.status(400).json({ message: 'That piece couldn’t be found.' });
+    await Wish.updateOne({ user: req.user.id }, { $pull: { products: req.params.id } });
+    await respond(res, req.user.id);
+  } catch (error) { res.status(500).json({ message: 'We couldn’t remove that piece.' }); }
 };
 
-// Clear wishlist
 export const clearWishList = async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
-
-    const wishList = await Wish.findOne({ user: userId });
-
-    if (!wishList) {
-      return res.status(404).json({ message: "Wishlist not found." });
-    }
-
-    wishList.products = [];
-    await wishList.save();
-
-    res.status(200).json(wishList);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    await Wish.updateOne({ user: req.user.id }, { $set: { products: [] } });
+    await respond(res, req.user.id);
+  } catch (error) { res.status(500).json({ message: 'We couldn’t clear your saved pieces.' }); }
 };
 
-// Merge wishlist items
+/** Pieces saved while signed out are folded in at sign-in. Accepts `items` or `products`. */
 export const mergeWishListItems = async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
-    const { products } = req.body;
-
-    let wishList = await Wish.findOne({ user: userId });
-
-    if (!wishList) {
-      wishList = new Wish({ user: userId, products: [] });
+    const incoming = (req.body.items ?? req.body.products ?? []).filter(isId).slice(0, 100);
+    if (incoming.length) {
+      await Wish.updateOne({ user: req.user.id }, { $addToSet: { products: { $each: incoming } } }, { upsert: true });
     }
-
-    products.forEach((productId) => {
-      if (!wishList.products.includes(productId)) {
-        wishList.products.push(productId);
-      }
-    });
-
-    await wishList.save();
-
-    res.status(200).json(wishList);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    await respond(res, req.user.id);
+  } catch (error) { res.status(500).json({ message: 'We couldn’t merge your saved pieces.' }); }
 };

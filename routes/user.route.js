@@ -1,13 +1,23 @@
 import express from "express"
 import {register,loginUser, updateUser, getuser,logoutUser} from "../controllers/user.controller.js"
 import { protect,isAdmin } from "../middlewares/authmiddleware.js"
+import { getMe, updateMe, changePassword, addAddress, updateAddress, removeAddress, myOrders } from "../controllers/account.controller.js"
 import jwt from "jsonwebtoken";
 
 const router = express.Router()
 
 router.post('/create',register)
 router.post('/login',loginUser)
-router.put('/update/:id',updateUser)
+router.put('/update/:id', protect, updateUser)
+
+// The signed-in shopper's own account (always req.user.id, never a URL id)
+router.get('/me', protect, getMe)
+router.patch('/me', protect, updateMe)
+router.patch('/me/password', protect, changePassword)
+router.get('/me/orders', protect, myOrders)
+router.post('/me/addresses', protect, addAddress)
+router.patch('/me/addresses/:addressId', protect, updateAddress)
+router.delete('/me/addresses/:addressId', protect, removeAddress)
 
 // router.get("/profile", protect, (req, res) => {
 //   res.json({ message: "Welcome to user profile", user: req.user });
