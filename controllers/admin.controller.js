@@ -4,6 +4,7 @@ import { User } from '../models/user.model.js';
 import { Product } from '../models/product.model.js';
 import { Category } from '../models/category.model.js';
 import { Collection } from '../models/collection.model.js';
+import { summarizeOrder } from '../utils/order-summary.js';
 
 /**
  * KŌRA Studio, the admin API. Roles are checked per route in admin.route.js.
@@ -93,7 +94,7 @@ export const overview = async (req, res) => {
       daily,
       topProducts: top.map(t => ({ id: String(t._id), name: t.name, units: t.units, revenue: t.revenue })),
       statuses: STATUSES.map(s => ({ status: s, count: statuses.find(x => x._id === s)?.count ?? 0 })),
-      recentOrders: recent.map(o => ({ _id: o._id, email: o.email, totalAmount: o.totalAmount, status: o.status ?? 'paid', createdAt: o.createdAt, items: (o.items ?? []).reduce((n, i) => n + (i.quantity ?? 1), 0) })),
+      recentOrders: recent.map(o => ({ _id: o._id, ref: summarizeOrder(o).ref, email: o.email, totalAmount: o.totalAmount, status: o.status ?? 'paid', createdAt: o.createdAt, items: (o.items ?? []).reduce((n, i) => n + (i.quantity ?? 1), 0) })),
       catalogue: {
         live: live.length,
         archived: products.length - live.length,
@@ -155,7 +156,10 @@ export const listOrders = async (req, res) => {
     if (req.query.q) {
       const re = new RegExp(escapeRegex(req.query.q.trim()), 'i');
       const or = [{ email: re }, { 'items.name': re }];
-      if (mongoose.isValidObjectId(req.query.q.trim())) or.push({ _id: req.query.q.trim() });
+      const q = req.query.q.trim().replace(/^#/, '');
+      if (mongoose.isValidObjectId(q)) or.push({ _id: q });
+      // The short reference shown everywhere (#72EECD1E) is the end of the order id.
+      if (/^[0-9a-f]{4,24}$/i.test(q)) or.push({ $expr: { $regexMatch: { input: { $toString: '$_id' }, regex: q + '$', options: 'i' } } });
       match.$or = or;
     }
     const [orders, total, counts] = await Promise.all([
@@ -164,7 +168,14 @@ export const listOrders = async (req, res) => {
       Order.aggregate([{ $group: { _id: statusExpr, count: { $sum: 1 } } }]),
     ]);
     res.json({
-      orders: orders.map(o => ({ ...o, status: o.status ?? 'paid' })),
+      orders: orders.map(o => {
+        const s = summarizeOrder(o);
+        return {
+          _id: o._id, ref: s.ref, email: o.email, sessionId: o.sessionId, createdAt: o.createdAt, status: s.status,
+          subtotal: s.subtotal, deliveryFee: s.deliveryFee, totalAmount: s.total,
+          items: s.lines.map(l => ({ name: l.name, size: l.size, quantity: l.quantity, unitPrice: l.unitPrice, price: l.amount, image: l.image, productId: l.productId })),
+        };
+      }),
       total, page, pages: Math.max(1, Math.ceil(total / limit)),
       counts: Object.fromEntries(STATUSES.map(s => [s, counts.find(c => c._id === s)?.count ?? 0])),
     });

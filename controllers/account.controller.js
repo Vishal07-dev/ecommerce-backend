@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { User } from '../models/user.model.js';
 import { Order } from '../models/Order.js';
+import { summarizeOrder } from '../utils/order-summary.js';
 
 /**
  * The signed-in shopper's own account. Every handler works on req.user.id
@@ -172,13 +173,15 @@ export const myOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
-    res.json(orders.map(o => ({
-      _id: o._id,
-      createdAt: o.createdAt,
-      totalAmount: o.totalAmount,
-      status: o.status ?? 'paid',
-      items: (o.items ?? []).map(i => ({ name: i.name, quantity: i.quantity, price: i.price, size: i.size, image: i.image, productId: i.productId })),
-    })));
+    res.json(orders.map(o => {
+      const s = summarizeOrder(o);
+      return {
+        _id: o._id, ref: s.ref, createdAt: o.createdAt, status: s.status,
+        subtotal: s.subtotal, deliveryFee: s.deliveryFee, totalAmount: s.total,
+        // price = line amount charged; unitPrice = one piece
+        items: s.lines.map(l => ({ name: l.name, size: l.size, quantity: l.quantity, unitPrice: l.unitPrice, price: l.amount, image: l.image, productId: l.productId })),
+      };
+    }));
   } catch (err) { fail(res, 500, 'We couldn’t load your orders. Try again.'); }
 };
 
