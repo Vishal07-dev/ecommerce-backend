@@ -10,7 +10,8 @@ const orderSchema = new mongoose.Schema({
     {
       name: String,
       quantity: Number,
-      price: Number,
+      price: Number,      // line total as charged (unit price × quantity)
+      unitPrice: Number,  // price of one piece (orders saved since the receipt fix)
       productId: String,
       size: String,
       category: String,
@@ -18,6 +19,8 @@ const orderSchema = new mongoose.Schema({
       image: String
     }
   ],
+  subtotal: Number,     // items before delivery
+  deliveryFee: Number,  // delivery charged (0 when free)
   totalAmount: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now }
 });

@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { Order } from '../models/Order.js';
 import { Product } from '../models/product.model.js';
 import { User } from '../models/user.model.js';
+import { summarizeOrder } from '../utils/order-summary.js';
 import dotenv from 'dotenv';
 dotenv.config();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); // from .env
@@ -97,7 +98,7 @@ export const storeOrderAfterPayment = async (req, res) => {
 
     // Reloading the success page must not create a second order.
     const existing = await Order.findOne({ sessionId: session.id });
-    if (existing) return res.status(200).json({ message: 'Order already saved', orderId: existing._id });
+    if (existing) return res.status(200).json({ message: 'Order already saved', orderId: existing._id, order: summarizeOrder(existing) });
 
     const lineItems = await stripe.checkout.sessions.listLineItems(sessionId, { expand: ['data.price.product'] });
 
@@ -105,6 +106,9 @@ export const storeOrderAfterPayment = async (req, res) => {
       sessionId: session.id,
       email: session.customer_details?.email ?? session.customer_email,
       ...(session.client_reference_id ? { userId: session.client_reference_id } : {}),
+      // Keep the real breakdown Stripe charged, so receipts add up exactly.
+      subtotal: (session.amount_subtotal ?? 0) / 100,
+      deliveryFee: (session.total_details?.amount_shipping ?? session.shipping_cost?.amount_total ?? 0) / 100,
       totalAmount: session.amount_total / 100,
       items: lineItems.data.map(item => {
         const product = typeof item.price?.product === 'object' ? item.price.product : null;
@@ -112,6 +116,7 @@ export const storeOrderAfterPayment = async (req, res) => {
           name: item.description,
           quantity: item.quantity,
           price: item.amount_total / 100,
+          unitPrice: (item.price?.unit_amount ?? Math.round(item.amount_total / Math.max(1, item.quantity))) / 100,
           productId: product?.metadata?.productId,
           size: product?.metadata?.size,
           image: product?.images?.[0],
@@ -121,7 +126,7 @@ export const storeOrderAfterPayment = async (req, res) => {
 
     await order.save();
 
-    res.status(201).json({ message: 'Order saved successfully', orderId: order._id });
+    res.status(201).json({ message: 'Order saved successfully', orderId: order._id, order: summarizeOrder(order) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
