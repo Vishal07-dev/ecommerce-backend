@@ -1,3 +1,4 @@
+import { Product } from '../models/product.model.js';
 import { Category } from '../models/category.model.js';
 
 // Get all categories
@@ -66,6 +67,11 @@ export const updateCategory = async (req, res) => {
 // Delete category
 export const deleteCategory = async (req, res) => {
   try {
+    // Products must always have a category, so a category in use can't go.
+    const inUse = await Product.countDocuments({ category: req.params.id });
+    if (inUse) {
+      return res.status(409).json({ message: `${inUse} ${inUse === 1 ? 'product uses' : 'products use'} this category. Move ${inUse === 1 ? 'it' : 'them'} to another category first.` });
+    }
     const category = await Category.findByIdAndDelete(req.params.id);
     if (!category) {
       return res.status(404).json({ message: 'Category does not exist' });

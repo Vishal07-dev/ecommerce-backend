@@ -53,7 +53,7 @@ export const createCheckoutSession = async (req, res) => {
 
       line_items: lines.map(({ item, product }) => {
         const size = item.size || 'One size';
-        const image = product.images?.find(i => i.role === 'model')?.url || product.images?.[0]?.url || product.image;
+        const image = product.images?.find(i => i.role !== 'look')?.url || product.images?.[0]?.url || product.image;
         return {
           price_data: {
             currency: 'inr',

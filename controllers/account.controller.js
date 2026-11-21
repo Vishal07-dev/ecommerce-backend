@@ -185,9 +185,10 @@ export const myOrders = async (req, res) => {
 /** True when this signed-in user may see the order (theirs, or an admin). */
 export async function ownsOrder(reqUser, order) {
   if (!reqUser) return false;
-  if (reqUser.role === 'admin') return true;
+  const user = await User.findById(reqUser.id).select('email role');
+  if (!user) return false;
+  if (['owner', 'admin', 'staff'].includes(user.role)) return true;
   if (order.userId && String(order.userId) === String(reqUser.id)) return true;
-  const user = await User.findById(reqUser.id).select('email');
-  return !!user && user.email === order.email;
+  return user.email === order.email;
 }
 

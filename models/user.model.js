@@ -38,7 +38,7 @@ const userSchema = new Schema({
     addresses:[addressSchema],
     role:{
         type:String,
-        enum:['admin','user'],
+        enum:['owner','admin','staff','user'],
         default:'user'
     },
     refreshtoken:{

@@ -83,7 +83,7 @@ export const loginUser = async (req, res) => {
 export const updateUser = async(req, res)=>{
   try {
     // Only the account owner or an admin may change an account.
-    if (req.user.role !== 'admin' && String(req.user.id) !== String(req.params.id)) {
+    if (!['owner', 'admin'].includes(req.user.role) && String(req.user.id) !== String(req.params.id)) {
       return res.status(403).json({ message: 'You can only change your own account.' });
     }
     const {name,email,address} = req.body

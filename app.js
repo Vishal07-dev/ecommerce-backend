@@ -12,6 +12,8 @@ import receiptRoutes from "./routes/recepiet.route.js"
 
 import wishListRoutes from "./routes/wishList.route.js"
 import editorialRoutes from "./routes/editorial.route.js"
+import adminRoutes from "./routes/admin.route.js"
+import teamRoutes from "./routes/team.route.js"
 
 import cors from "cors"
 import cookieParser from "cookie-parser";
@@ -46,5 +48,7 @@ app.use('/api/wishlist',wishListRoutes)
 app.use('/api/payment',paymentRoutes)
 app.use('/api/receipet',receiptRoutes)
 app.use('/api/editorial', editorialRoutes)
+app.use('/api/admin', adminRoutes)
+app.use('/api/team', teamRoutes)
 
 export {app}

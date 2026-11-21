@@ -113,7 +113,7 @@ export const sendChat = async (req, res) => {
 
     const products = namedIn(reply, all).map(p => ({
       _id: p._id, name: p.name, slug: p.slug, price: p.price, colorway: p.colorway?.name,
-      image: (p.images?.find(i => i.role === 'model') ?? p.images?.[0])?.url,
+      image: (p.images?.find(i => i.role !== 'look') ?? p.images?.[0])?.url,
     }));
 
     res.status(200).json({ reply, products });

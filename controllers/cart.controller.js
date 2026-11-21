@@ -18,7 +18,7 @@ const sizeIsValid = (product, size) =>
   product.variants?.length ? product.variants.some(v => v.size === size) : size === ONE_SIZE;
 
 const primaryImage = (product) =>
-  product.images?.find(i => i.role === 'model')?.url || product.images?.[0]?.url || product.image;
+  product.images?.find(i => i.role !== 'look')?.url || product.images?.[0]?.url || product.image;
 
 // Shape the cart the storefront renders: one flat line per product + size.
 const serialize = (cart) => {

@@ -3,6 +3,7 @@ import {register,loginUser, updateUser, getuser,logoutUser} from "../controllers
 import { protect,isAdmin } from "../middlewares/authmiddleware.js"
 import { getMe, updateMe, changePassword, addAddress, updateAddress, removeAddress, myOrders } from "../controllers/account.controller.js"
 import jwt from "jsonwebtoken";
+import { User } from "../models/user.model.js";
 
 const router = express.Router()
 
@@ -28,7 +29,7 @@ router.get("/admin-data", protect, isAdmin, (req, res) => {
   res.json({ message: "Welcome Admin" });
 });
 
-router.post("/refresh-token", (req, res) => {
+router.post("/refresh-token", async (req, res) => {
   const token = req.cookies.refreshToken;
 
   if (!token) {
@@ -40,10 +41,14 @@ router.post("/refresh-token", (req, res) => {
     const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
 
     // Create a new short-lived access token
+    // The role comes from the database, so a changed or removed role
+    // takes effect at the next renewal instead of lingering in old tokens.
+    const user = await User.findById(decoded.id).select('role').lean();
+    if (!user) return res.status(401).json({ message: "Account not found" });
     const newAccessToken = jwt.sign(
-      { id: decoded.id, role: decoded.role }, // include role if needed
+      { id: decoded.id, role: user.role ?? 'user' },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.ACCESS_EXPIRES_IN || '30s' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || process.env.ACCESS_EXPIRES_IN || '1d' }
     );
 
     // Return only access token; refresh token stays in cookie
